@@ -1,16 +1,31 @@
-# React + Vite
+# Distributed Search frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The React and Vite frontend provides a responsive search experience for the
+FastAPI service in `search/backend`.
 
-Currently, two official plugins are available:
+## Run locally
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+From this directory, install the locked dependencies and start the dev server:
 
-## React Compiler
+```bash
+npm ci
+npm run dev
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+By default, the app connects to `http://127.0.0.1:8000`. To use another backend,
+set `VITE_API_URL` in a local `.env.local` file:
 
-## Expanding the Oxlint configuration
+```env
+VITE_API_URL=http://127.0.0.1:8000
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+The frontend checks `/health` to show whether the API and search index are ready.
+Search results include BM25 and PageRank signals, the combined ranking score,
+result count, and search duration. Theme preference is saved in browser storage.
+
+## Checks
+
+```bash
+npm run lint
+npm run build
+```

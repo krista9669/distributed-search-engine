@@ -150,8 +150,10 @@ The React frontend provides a responsive search interface with the following fea
 
 - Search input for submitting document queries.
 - Search result presentation with document titles, URLs, and snippets.
+- Suggested starter queries and a search overview when no query is active.
 - BM25 relevance scores.
 - PageRank scores and final ranking scores.
+- Result count and search execution time.
 - Backend connection status.
 - Indexed document count.
 - Light and dark theme toggle.
@@ -159,7 +161,7 @@ The React frontend provides a responsive search interface with the following fea
 - Responsive layout for different screen sizes.
 - Loading, error, and empty-result states.
 
-The interface uses a blue-and-white light theme and a dark navy theme with blue accents.
+The interface uses a soft sage-green light theme and a deep forest-green dark theme.
 
 ## Installation and Setup
 
@@ -273,8 +275,8 @@ http://localhost:5173
 
 Use the theme toggle in the top-right corner of the interface.
 
-- Select **Dark** to switch to the dark navy theme.
-- Select **Light** to return to the blue-and-white theme.
+- Select **Dark** to switch to the deep forest-green theme.
+- Select **Light** to return to the soft sage-green theme.
 
 The selected preference is stored in browser local storage and is retained across page refreshes.
 
@@ -360,7 +362,7 @@ npm run build
 | BM25 retrieval | Implemented |
 | BM25 + PageRank ranking | Implemented |
 | React search frontend | Implemented |
-| Blue-and-white light theme | Implemented |
+| Sage-green light theme | Implemented |
 | Dark mode toggle | Implemented |
 | Persistent theme preference | Implemented |
 | Backend API tests | Passing |
