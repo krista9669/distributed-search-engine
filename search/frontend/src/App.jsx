@@ -1,7 +1,9 @@
+
 import { useEffect, useState } from "react";
 import "./App.css";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+const API_URL =
+  import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 function App() {
   const [query, setQuery] = useState("");
@@ -9,27 +11,40 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState("");
-  const [health, setHealth] = useState(null);
-  const [searchTime, setSearchTime] = useState(0);
+  const [backendOnline, setBackendOnline] = useState(false);
+  const [documentCount, setDocumentCount] = useState(0);
+
+  const [theme, setTheme] = useState(
+    () => localStorage.getItem("search-theme") || "light"
+  );
 
   useEffect(() => {
-    const checkHealth = async () => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem("search-theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((current) => current === "light" ? "dark" : "light");
+  };
+
+  useEffect(() => {
+    const checkBackend = async () => {
       try {
         const response = await fetch(`${API_URL}/health`);
-        if (!response.ok) throw new Error("Backend unavailable");
-        setHealth(await response.json());
+        const data = await response.json();
+
+        setBackendOnline(response.ok);
+        setDocumentCount(data.documents_loaded ?? 0);
       } catch {
-        setHealth(null);
+        setBackendOnline(false);
       }
     };
 
-    checkHealth();
-    const interval = setInterval(checkHealth, 10000);
-    return () => clearInterval(interval);
+    checkBackend();
   }, []);
 
-  const handleSearch = async (event) => {
-    event.preventDefault();
+  const performSearch = async (event) => {
+    event?.preventDefault();
 
     if (!query.trim()) return;
 
@@ -39,142 +54,246 @@ function App() {
     setResults([]);
 
     try {
-      const params = new URLSearchParams({
-        q: query.trim(),
-        top_k: "10",
-      });
-
-      const response = await fetch(`${API_URL}/search?${params}`);
+      const response = await fetch(
+        `${API_URL}/search?q=${encodeURIComponent(query.trim())}&top_k=10`
+      );
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.detail || "Search failed");
+        throw new Error("Search request failed. Please try again.");
       }
 
       const data = await response.json();
-      setResults(data.results);
-      setSearchTime(data.search_time_ms);
+      setResults(data.results ?? []);
     } catch (err) {
-      setError(err.message || "Unable to connect to backend");
+      setError(err.message || "Unable to connect to the search service.");
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <main className="app">
-      <header className="topbar">
-        <div className="brand">
-          <span className="brand-icon">DS</span>
-          <span>Distributed Search</span>
-        </div>
+  const clearSearch = () => {
+    setQuery("");
+    setResults([]);
+    setError("");
+    setSearched(false);
+  };
 
-        <div className="connection">
-          <span className={`status-dot ${health ? "online" : ""}`} />
-          {health ? "Backend connected" : "Backend disconnected"}
+  const formatScore = (score) =>
+    typeof score === "number" ? score.toFixed(4) : "N/A";
+
+  return (
+    <div className={`app ${theme}`}>
+      <header className="header">
+        <div className="header-content">
+          <button className="brand" onClick={clearSearch}>
+            <span className="brand-icon">S</span>
+            <span>Distributed Search Engine</span>
+          </button>
+
+          <div className="header-actions">
+            <button
+              className="theme-toggle"
+              onClick={toggleTheme}
+              aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+              title="Toggle theme"
+            >
+              {theme === "light" ? "☾ Dark" : "☀ Light"}
+            </button>
+
+            <div className="connection-status">
+              <span
+                className={`status-dot ${
+                  backendOnline ? "online" : "offline"
+                }`}
+              />
+              {backendOnline ? "Backend connected" : "Backend disconnected"}
+            </div>
+          </div>
         </div>
       </header>
 
-      <section className="hero">
-        <div className="eyebrow">DISTRIBUTED INFORMATION RETRIEVAL</div>
-
-        <h1>
-          Find information.
-          <br />
-          <span>Discover connections.</span>
-        </h1>
-
-        <p className="subtitle">
-          Search across documents using BM25 relevance and PageRank scoring.
-        </p>
-
-        <form className="search-form" onSubmit={handleSearch}>
-          <span className="search-icon">⌕</span>
-
-          <input
-            type="text"
-            placeholder="Search for anything..."
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-
-          <button type="submit" disabled={loading || !query.trim()}>
-            {loading ? "Searching..." : "Search"}
-          </button>
-        </form>
-
-        <div className="search-meta">
-          <span>BM25 + PageRank</span>
-          <span>70% relevance · 30% authority</span>
-        </div>
-      </section>
-
-      <section className="results-section">
-        {loading && <p className="message">Searching documents...</p>}
-
-        {error && <p className="error-message">{error}</p>}
-
-        {!loading && searched && !error && (
-          <>
-            <div className="results-heading">
-              <h2>Search Results</h2>
-              <span>
-                {results.length} results · {searchTime.toFixed(2)} ms
-              </span>
-            </div>
-
-            {results.length === 0 ? (
-              <p className="message">No matching documents found.</p>
-            ) : (
-              <div className="results-list">
-                {results.map((result, index) => (
-                  <article className="result-card" key={result.doc_id}>
-                    <div className="result-top">
-                      <span className="rank">#{index + 1}</span>
-                      <span className="score">
-                        Score {result.final_score.toFixed(4)}
-                      </span>
-                    </div>
-
-                    <h3>{result.title}</h3>
-
-                    <a
-                      href={result.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {result.url}
-                    </a>
-
-                    <p className="snippet">{result.snippet}</p>
-
-                    <div className="score-details">
-                      <span>BM25: {result.bm25_score.toFixed(4)}</span>
-                      <span>
-                        PageRank: {result.pagerank_score.toFixed(4)}
-                      </span>
-                      <span>Final: {result.final_score.toFixed(4)}</span>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-
-        {!searched && !loading && (
-          <div className="empty-state">
-            <div className="empty-icon">⌕</div>
-            <h2>Start exploring</h2>
-            <p>Enter a query above to search the document collection.</p>
+      <main className="main-content">
+        <section className="hero">
+          <div className="eyebrow">
+            DISTRIBUTED INFORMATION RETRIEVAL
           </div>
-        )}
-      </section>
 
-      <footer>
-        Distributed Search Engine · Node 4 · FastAPI + React
+          <h1>
+            Find information <span>faster.</span>
+          </h1>
+
+          <p className="subtitle">
+            Search across documents using distributed indexing,
+            BM25 retrieval and PageRank-based ranking.
+          </p>
+
+          <form className="search-form" onSubmit={performSearch}>
+            <span className="search-icon">⌕</span>
+
+            <input
+              type="text"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Enter keywords to search documents..."
+              aria-label="Search documents"
+            />
+
+            {query && (
+              <button
+                type="button"
+                className="clear-button"
+                onClick={clearSearch}
+                aria-label="Clear search"
+              >
+                ×
+              </button>
+            )}
+
+            <button
+              type="submit"
+              className="search-button"
+              disabled={loading || !query.trim()}
+            >
+              {loading ? "Searching..." : "Search"}
+            </button>
+          </form>
+
+          <div className="search-info">
+            <span>BM25</span>
+            <span className="info-separator">•</span>
+            <span>PageRank</span>
+            <span className="info-separator">•</span>
+            <span>Apache Spark</span>
+            <span className="info-separator">•</span>
+            <span>Apache Hadoop</span>
+          </div>
+        </section>
+
+        <section className="results-section">
+          {searched && (
+            <div className="results-header">
+              <div>
+                <h2>Search Results</h2>
+                <p>
+                  {loading
+                    ? "Searching documents..."
+                    : `${results.length} result(s) found`}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {loading && (
+            <div className="message-card">
+              <div className="loader" />
+              <p>Searching through the document collection...</p>
+            </div>
+          )}
+
+          {error && !loading && (
+            <div className="message-card error-message">
+              <h3>Something went wrong</h3>
+              <p>{error}</p>
+              <button onClick={performSearch}>Try again</button>
+            </div>
+          )}
+
+          {!loading && !error && searched && results.length === 0 && (
+            <div className="message-card">
+              <h3>No results found</h3>
+              <p>Try different keywords or a broader search query.</p>
+            </div>
+          )}
+
+          {!loading && !error && results.length > 0 && (
+            <div className="results-list">
+              {results.map((result, index) => (
+                <article
+                  className="result-card"
+                  key={result.doc_id ?? index}
+                >
+                  <div className="result-topline">
+                    <span className="result-number">
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
+
+                    <span className="score-label">
+                      Score: {formatScore(result.final_score)}
+                    </span>
+                  </div>
+
+                  <h3 className="result-title">
+                    {result.url ? (
+                      <a
+                        href={result.url}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {result.title || result.doc_id || "Untitled document"}
+                      </a>
+                    ) : (
+                      result.title || result.doc_id || "Untitled document"
+                    )}
+                  </h3>
+
+                  {result.url && (
+                    <p className="result-url">{result.url}</p>
+                  )}
+
+                  <p className="result-snippet">
+                    {result.snippet || result.text || "No preview available."}
+                  </p>
+
+                  <div className="result-scores">
+                    <span>
+                      <strong>BM25:</strong>{" "}
+                      {formatScore(result.bm25_score)}
+                    </span>
+
+                    <span>
+                      <strong>PageRank:</strong>{" "}
+                      {formatScore(result.pagerank_score)}
+                    </span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+
+          {!searched && (
+            <div className="welcome-section">
+              <div className="welcome-icon">⌕</div>
+              <h2>Start your search</h2>
+              <p>
+                Enter a query above to retrieve relevant documents
+                from the indexed collection.
+              </p>
+            </div>
+          )}
+        </section>
+
+        <section className="system-info">
+          <div className="system-info-item">
+            <span className="system-info-label">INDEXED DOCUMENTS</span>
+            <strong>{documentCount.toLocaleString()}</strong>
+          </div>
+
+          <div className="system-info-item">
+            <span className="system-info-label">RETRIEVAL MODEL</span>
+            <strong>BM25</strong>
+          </div>
+
+          <div className="system-info-item">
+            <span className="system-info-label">RANKING MODEL</span>
+            <strong>PageRank</strong>
+          </div>
+        </section>
+      </main>
+
+      <footer className="footer">
+        Distributed Search Engine · Big Data Project
       </footer>
-    </main>
+    </div>
   );
 }
 
