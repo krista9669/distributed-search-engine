@@ -126,11 +126,11 @@ FinalScore = 0.7 \times NormalizedBM25
 + 0.3 \times NormalizedPageRank
 \]
 
-Current backend implementation uses min-max normalization for BM25 candidate scores and maximum-score normalization for PageRank.
+The current backend implementation uses min-max normalization for BM25 candidate scores and maximum-score normalization for PageRank.
 
 ## Node 4: Search Service
 
-Node 4 hosts the search application.
+Node 4 hosts the search application, consisting of a FastAPI backend and a React frontend.
 
 ### Backend
 
@@ -146,13 +146,20 @@ The FastAPI backend provides:
 
 ### Frontend
 
-The React frontend provides:
+The React frontend provides a responsive search interface with the following features:
 
-- Search input.
-- Search result presentation.
-- Document links.
-- Relevance and PageRank information.
-- Backend health status.
+- Search input for submitting document queries.
+- Search result presentation with document titles, URLs, and snippets.
+- BM25 relevance scores.
+- PageRank scores and final ranking scores.
+- Backend connection status.
+- Indexed document count.
+- Light and dark theme toggle.
+- Persistent theme preference across page refreshes.
+- Responsive layout for different screen sizes.
+- Loading, error, and empty-result states.
+
+The interface uses a blue-and-white light theme and a dark navy theme with blue accents.
 
 ## Installation and Setup
 
@@ -262,6 +269,15 @@ Open:
 http://localhost:5173
 ```
 
+### 6. Switch between themes
+
+Use the theme toggle in the top-right corner of the interface.
+
+- Select **Dark** to switch to the dark navy theme.
+- Select **Light** to return to the blue-and-white theme.
+
+The selected preference is stored in browser local storage and is retained across page refreshes.
+
 ## API Reference
 
 ### Health Check
@@ -328,6 +344,13 @@ The current backend test suite covers:
 - Ranking behavior.
 - API endpoints and validation.
 
+Build the frontend for production:
+
+```bash
+cd search/frontend
+npm run build
+```
+
 ## Development Status
 
 | Component | Status |
@@ -337,6 +360,9 @@ The current backend test suite covers:
 | BM25 retrieval | Implemented |
 | BM25 + PageRank ranking | Implemented |
 | React search frontend | Implemented |
+| Blue-and-white light theme | Implemented |
+| Dark mode toggle | Implemented |
+| Persistent theme preference | Implemented |
 | Backend API tests | Passing |
 | Frontend production build | Successful |
 | Distributed cluster integration | In progress |
