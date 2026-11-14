@@ -344,7 +344,16 @@ The current backend test suite covers:
 
 ## Contributors
 
-This project is developed collaboratively using a four-node distributed architecture, with each node responsible for a specific part of the processing and search pipeline.
+This project is developed collaboratively by a four-member team using a distributed four-node architecture.
+
+| Node | Team Member (PES ID) | Responsibility |
+|---|---|---|
+| Node 1 | PES2UG24CS011 | Data Ingestion and Validation |
+| Node 2 | PES2UG24CS361 | HDFS Storage and Spark Worker |
+| Node 3 | PES2UG24CS200 | Distributed Processing, Inverted Index and PageRank |
+| Node 4 | PES2UG24CS234 | FastAPI Search Service and React Frontend |
+
+Each team member is responsible for implementing and integrating their assigned component into the distributed search engine.
 
 ---
 
