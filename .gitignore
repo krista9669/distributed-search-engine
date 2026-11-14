@@ -1,0 +1,38 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+dist/
+
+# Generated data and exports
+data/export/*
+!data/export/.gitkeep
+data/phase0/*
+data/phase1/*
+*.parquet
+
+# Local Spark / Iceberg data
+warehouse/
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+hdfs_test.txt
