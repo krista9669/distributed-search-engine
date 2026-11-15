@@ -1,38 +1,75 @@
+
+# ==============================
 # Python
+# ==============================
 .venv/
 venv/
 __pycache__/
 *.py[cod]
+*.egg-info/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .coverage
 htmlcov/
 
-# Environment and secrets
+# ==============================
+# Node / Frontend
+# ==============================
+node_modules/
+dist/
+search/frontend/dist/
+search/frontend/.vite/
+
+# ==============================
+# Environment and Secrets
+# ==============================
 .env
 .env.*
 !.env.example
+cluster.env
+search/frontend/.env.local
 
-# Node
-node_modules/
-dist/
-
-# Generated data and exports
+# ==============================
+# Data, Exports and Datasets
+# ==============================
+serving/
 data/export/*
 !data/export/.gitkeep
+
 data/phase0/*
 data/phase1/*
-*.parquet
 
-# Local Spark / Iceberg data
 warehouse/
+metastore_db/
+spark-warehouse/
+derby.log
+
+*.parquet
+*.crc
+
+# Preserve small sample datasets
+!data/sample/
+!data/sample/**
+
+# ==============================
+# Logs and Temporary Files
+# ==============================
 logs/
 *.log
+tmp/
+*.tmp
+*.swp
 
-# IDE
-.vscode/
+# ==============================
+# IDE and OS
+# ==============================
 .idea/
-
-# OS
+.vscode/
 .DS_Store
 Thumbs.db
+
+# ==============================
+# Miscellaneous
+# ==============================
 hdfs_test.txt
