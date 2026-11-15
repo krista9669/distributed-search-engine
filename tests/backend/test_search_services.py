@@ -1,3 +1,4 @@
+
 import pandas as pd
 import pytest
 
@@ -35,10 +36,7 @@ def sample_documents():
 
 def test_parquet_loader(tmp_path, sample_documents):
     dataframe = pd.DataFrame(sample_documents)
-    dataframe.to_parquet(
-        tmp_path / "documents.parquet",
-        index=False
-    )
+    dataframe.to_parquet(tmp_path / "documents.parquet", index=False)
 
     documents = load_documents(tmp_path)
 
@@ -71,14 +69,8 @@ def test_bm25_empty_query(sample_documents):
 
 def test_ranking_service(sample_documents):
     bm25_results = [
-        {
-            "document": sample_documents[0],
-            "bm25_score": 2.0
-        },
-        {
-            "document": sample_documents[1],
-            "bm25_score": 1.0
-        }
+        {"document": sample_documents[0], "bm25_score": 2.0},
+        {"document": sample_documents[1], "bm25_score": 1.0}
     ]
 
     results = RankingService.rank(bm25_results)
@@ -86,6 +78,59 @@ def test_ranking_service(sample_documents):
     assert len(results) == 2
     assert results[0]["document"]["doc_id"] == "1"
     assert results[0]["final_score"] == pytest.approx(1.0)
+
+
+def test_ranking_uses_max_normalization(sample_documents):
+    bm25_results = [
+        {"document": sample_documents[0], "bm25_score": 10.0},
+        {"document": sample_documents[1], "bm25_score": 5.0}
+    ]
+
+    results = RankingService.rank(bm25_results)
+
+    second = next(
+        item for item in results
+        if item["document"]["doc_id"] == "2"
+    )
+
+    expected = 0.7 * (5.0 / 10.0) + 0.3 * (0.65 / 0.85)
+
+    assert second["final_score"] == pytest.approx(expected)
+
+
+def test_ranking_uses_exact_70_30_weights(sample_documents):
+    bm25_results = [
+        {"document": sample_documents[0], "bm25_score": 8.0},
+        {"document": sample_documents[1], "bm25_score": 4.0}
+    ]
+
+    results = RankingService.rank(bm25_results)
+
+    second = next(
+        item for item in results
+        if item["document"]["doc_id"] == "2"
+    )
+
+    expected = 0.7 * 0.5 + 0.3 * (0.65 / 0.85)
+
+    assert second["final_score"] == pytest.approx(expected)
+
+
+def test_ranking_handles_zero_scores(sample_documents):
+    documents = [
+        {**sample_documents[0], "pagerank_score": 0.0},
+        {**sample_documents[1], "pagerank_score": 0.0}
+    ]
+
+    bm25_results = [
+        {"document": documents[0], "bm25_score": 0.0},
+        {"document": documents[1], "bm25_score": 0.0}
+    ]
+
+    results = RankingService.rank(bm25_results)
+
+    assert all(item["final_score"] == pytest.approx(0.0)
+               for item in results)
 
 
 def test_ranking_empty_results():

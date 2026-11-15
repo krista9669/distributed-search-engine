@@ -3,6 +3,7 @@ from time import perf_counter
 from search.backend.services.bm25_service import BM25Service
 from search.backend.services.parquet_loader import load_documents
 from search.backend.services.ranking_service import RankingService
+from search.backend.services.snippet_cleaner import clean_wikipedia_text
 
 
 class SearchService:
@@ -48,7 +49,7 @@ class SearchService:
                 "doc_id": document["doc_id"],
                 "title": document["title"],
                 "url": document["url"],
-                "snippet": text[:240],
+                "snippet": clean_wikipedia_text(text, max_length=240),
                 "bm25_score": item["bm25_score"],
                 "pagerank_score": item["pagerank_score"],
                 "final_score": item["final_score"]

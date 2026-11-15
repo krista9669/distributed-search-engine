@@ -1,3 +1,4 @@
+
 class RankingService:
     BM25_WEIGHT = 0.7
     PAGERANK_WEIGHT = 0.3
@@ -8,7 +9,8 @@ class RankingService:
             return []
 
         bm25_scores = [
-            item["bm25_score"] for item in bm25_results
+            float(item["bm25_score"])
+            for item in bm25_results
         ]
 
         pagerank_scores = [
@@ -16,7 +18,6 @@ class RankingService:
             for item in bm25_results
         ]
 
-        min_bm25 = min(bm25_scores)
         max_bm25 = max(bm25_scores)
         max_pagerank = max(pagerank_scores)
 
@@ -25,18 +26,16 @@ class RankingService:
         for item in bm25_results:
             document = item["document"]
 
-            bm25_score = item["bm25_score"]
+            bm25_score = float(item["bm25_score"])
             pagerank_score = float(
                 document.get("pagerank_score", 0.0)
             )
 
-            if max_bm25 > min_bm25:
-                normalized_bm25 = (
-                    (bm25_score - min_bm25)
-                    / (max_bm25 - min_bm25)
-                )
-            else:
-                normalized_bm25 = 1.0
+            # Maximum normalization as specified in the assignment.
+            normalized_bm25 = (
+                bm25_score / max_bm25
+                if max_bm25 > 0 else 0.0
+            )
 
             normalized_pagerank = (
                 pagerank_score / max_pagerank

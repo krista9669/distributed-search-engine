@@ -10,14 +10,18 @@ def client():
     original_bm25 = search_service.bm25
     original_loaded = search_service.loaded
 
-    search_service.load("data/export/test")
+    try:
+        with TestClient(app) as test_client:
+            # Load the test dataset AFTER FastAPI startup.
+            search_service.load("data/export/test")
 
-    with TestClient(app) as test_client:
-        yield test_client
+            yield test_client
 
-    search_service.documents = original_documents
-    search_service.bm25 = original_bm25
-    search_service.loaded = original_loaded
+    finally:
+        # Restore the previous search service state.
+        search_service.documents = original_documents
+        search_service.bm25 = original_bm25
+        search_service.loaded = original_loaded
 
 
 def test_root_endpoint(client):
