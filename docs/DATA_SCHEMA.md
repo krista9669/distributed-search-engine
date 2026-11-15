@@ -1,94 +1,106 @@
 # Data Schemas
 
-Three data shapes matter: the ingestion inputs, the Iceberg table, and the serving Parquet export.
-
-> Fields marked **confirm** are inferred from the workflow description and must be checked against the ingestion code before this document is treated as authoritative.
+Three data shapes matter: the ingestion inputs, the Iceberg table, and the serving Parquet export. This document is derived from the code in `ingestion/`, `export/` and `search/backend/`.
 
 ## 1. Ingestion inputs (Node 1)
 
-Both files are JSON Lines: one JSON object per line.
+Both inputs are JSON Lines: one JSON object per line. Rules are implemented in `ingestion/core.py` and configured in `ingestion/config.py`.
 
-### `pages.jsonl` (Phase 0)
+### `pages.jsonl` (Phase 0) and `changes.jsonl` (Phase 1)
 
-Initial corpus. The verified baseline has 1,000 records.
+| Field | Type | UPSERT | DELETE | Notes |
+|---|---|---|---|---|
+| `op` | string | optional | required | `UPSERT` or `DELETE` (case-insensitive). A line without `op` is an UPSERT, which is how Phase 0 records look |
+| `doc_id` | string or integer | required | required | Must be non-empty; integers are converted to strings |
+| `url` | string | required, non-empty | ignored | |
+| `title` | string | required, non-empty | ignored | |
+| `text` | string | required, non-empty | ignored | |
+| `links` | list of strings | optional | ignored | Targets are `doc_id` values. Missing means `[]` |
+| `version` | integer | optional | optional | Defaults to the phase number (0 or 1). Must be an integer if present |
 
-| Field | Type | Notes |
-|---|---|---|
-| `doc_id` | string | Unique identifier (confirm exact name and type) |
-| `url` | string | Document URL; must be non-empty |
-| `title` | string | Must be non-empty |
-| `text` | string | Document body; must be non-empty |
-| `links` | array of `doc_id` strings | Outgoing links used for PageRank (confirm exact name and shape) |
+Examples:
 
-### `changes.jsonl` (Phase 1)
+```json
+{"doc_id": "112", "url": "https://simple.wikipedia.org/wiki/Computer", "title": "Computer", "text": "A computer is ...", "links": ["709", "905"]}
+{"op": "UPSERT", "doc_id": "112", "url": "...", "title": "...", "text": "...", "links": ["709"]}
+{"op": "DELETE", "doc_id": "153"}
+```
 
-Change batch. The rehearsal batch had 100 lines (50 UPSERT, 50 DELETE).
+### Validation and conflict rules
 
-| Field | Type | Notes |
-|---|---|---|
-| `op` | string | `UPSERT` or `DELETE` (confirm field name) |
-| `doc_id` | string | Target document |
-| `url`, `title`, `text`, `links` | as above | Present for UPSERT; not needed for DELETE |
+- A line must be a JSON object. Blank lines are skipped, not rejected.
+- Invalid lines are counted and written to `logs/rejects_phase<N>.jsonl`; they are never applied. Reasons: malformed JSON, not an object, invalid `op`, missing or empty `doc_id`, non-integer `version`, missing required field, empty `url`/`title`/`text`, `links` not a list of strings.
+- Within one input, records are deduplicated by `doc_id`: the highest `version` wins; on a tie the later line wins. Same-version records with different content are counted as conflicts.
+- An UPSERT whose version is lower than the version already in the table is ignored (stale).
+- Link targets that are not documents in the resulting table are removed, preserving the order of the rest.
+- If the table already contains a higher phase than the one being run, the run is skipped and changes nothing.
+- To make `links` mandatory, add `"links"` to `REQUIRED_FIELDS` in `ingestion/config.py`.
 
-### Validation rules
+## 2. Iceberg table `lake.search.documents`
 
-- Every line must parse as JSON.
-- Required fields must be present and non-empty for the operation type.
-- The operation must be one of the supported values.
-- Invalid lines are counted and reported as rejected, not applied.
-- Repeated operations on the same `doc_id` are deduplicated; contradictory operations are resolved by the ingestion rules (document the exact rule here once confirmed, for example "last operation wins").
-
-## 2. Iceberg table: `lake.search.documents`
-
-Stored under `hdfs://10.145.6.245:9000/warehouse`.
+Format version 2, in the warehouse `hdfs://10.145.6.245:9000/warehouse`. Created by `ingest.py`.
 
 | Column | Type | Notes |
 |---|---|---|
-| `doc_id` | string | Primary identifier; unique per row |
+| `doc_id` | string | Unique per row |
 | `url` | string | |
 | `title` | string | |
 | `text` | string | |
-| `links` | array of string | Outgoing references; no dangling targets after processing |
-| phase marker | string or int | Used by verification to report the phase distribution (confirm column name) |
+| `links` | array&lt;string&gt; | Every entry is the `doc_id` of a document in the table |
+| `version` | int | The record's `version`, else the phase number |
+| `phase` | int | Phase that last wrote the row |
+| `content_hash` | string | SHA-256 of `url`, `title`, `text`, `links`; used to detect real changes |
 
-Invariants checked by verification:
+Invariants checked by `ingest.py` and `verify.py`:
 
 - `COUNT(*) = COUNT(DISTINCT doc_id)`
-- `url`, `title`, and `text` are never empty
-- Every id in `links` exists in the table (no dangling links)
-- Snapshots exist for Phase 0 and Phase 1; the Phase 0 snapshot can be read by time travel
+- `url`, `title` and `text` are never empty
+- No dangling links
+- One snapshot per phase that changed the table; the Phase 0 snapshot stays readable by time travel
 
-Inspect snapshots:
+Inspect snapshots with `python ingestion/verify.py ...` (it prints them), or in Spark SQL:
 
 ```sql
 SELECT snapshot_id, committed_at, operation FROM lake.search.documents.snapshots;
-SELECT COUNT(*) FROM lake.search.documents VERSION AS OF <snapshot_id>;
 ```
 
-## 3. Serving Parquet export (Node 4)
+## 3. Derived data on HDFS (Node 3)
 
-| Field | Type | Required | Notes |
+| Path | Columns |
+|---|---|
+| `/derived/<version>/index` | `term` string, `df` int, `postings` array&lt;struct&lt;`doc_id`, `tf`&gt;&gt; |
+| `/derived/<version>/doc_stats` | `doc_id` string, `doc_len` int |
+| `/derived/<version>/pagerank` | `doc_id` string, `pagerank_score` double |
+
+Tokenizer for the index: lowercase text, tokens matching `\b[a-z0-9]+\b`, over `title + " " + text`. It must match `search/backend/services/bm25_service.py`.
+
+## 4. Serving Parquet export (Node 3 to Node 4)
+
+Published to `/export/<version>` on HDFS by `export/export.py`, 2 files by default.
+
+| Field | Type | Required by Node 4 | Notes |
 |---|---|---|---|
-| `doc_id` | string | Yes | Unique |
-| `title` | string | Yes | |
-| `url` | string | Yes | |
+| `doc_id` | string | Yes | Unique, never null |
+| `title` | string | Yes | Never null |
+| `url` | string | Yes | Never null |
 | `text` | string | Yes | Used for BM25 and snippets |
-| `pagerank_score` | double | No | Defaults to 0 if absent |
+| `pagerank_score` | double | No | Defaults to 0 if absent; the export always includes it |
 
-- Verified Phase 0 export: 1,000 rows, these five fields.
-- The backend normalizes supported alternate column names when loading.
-- `SEARCH_EXPORT_PATH` must point at the export directory, never at the Iceberg warehouse.
+The backend also accepts alternate column names (`id`, `content`, `pagerank`, and others; see the README) and a single `.parquet` file or a directory of them. `SEARCH_EXPORT_PATH` must point at the export, never at the Iceberg warehouse.
 
-## 4. API response shape
+## 5. API response
 
-`GET /search` returns query metadata and a list of results:
+`GET /search` returns:
 
 | Field | Description |
 |---|---|
-| `doc_id` | Document identifier |
-| `title` | Title |
-| `url` | Source URL |
-| `snippet` | Cleaned display snippet |
-| `bm25_score` | Raw BM25 score |
-| `pagerank_score` | PageRank score |
-| `final_score` | `0.7 * norm(bm25) + 0.3 * norm(pagerank)` |
+| `query` | The query as sent |
+| `total_results` | Number of results returned (at most `top_k`) |
+| `search_time_ms` | Server-side time to search and rank |
+| `results[].doc_id` | Document identifier |
+| `results[].title` | Title |
+| `results[].url` | Source URL |
+| `results[].snippet` | Cleaned snippet, at most 240 characters |
+| `results[].bm25_score` | Raw BM25 score |
+| `results[].pagerank_score` | PageRank score |
+| `results[].final_score` | `0.7 * (bm25 / max_bm25) + 0.3 * (pagerank / max_pagerank)`, maxima taken over all matching documents |
