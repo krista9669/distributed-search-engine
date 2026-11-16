@@ -634,7 +634,13 @@ A signal whose maximum is 0 contributes 0. Results are sorted by final score, de
 React 19 with Vite, in `search/frontend/`.
 
 <div align="center">
-<img src="docs/images/Pagerank_Preview.jpg" alt="Search results for 'machine learning' showing BM25, PageRank and rank score" width="820" />
+<img src="docs/images/Pagerank_Preview0.jpg" alt="Search results for 'machine learning' showing BM25, PageRank and rank score" width="820" />
+</div>
+<div align="center">
+<img src="docs/images/Pagerank_Preview1.jpg" alt="Search results for 'machine learning' showing BM25, PageRank and rank score" width="820" />
+</div>
+<div align="center">
+<img src="docs/images/Pagerank_Preview2.jpg" alt="Search results for 'machine learning' showing BM25, PageRank and rank score" width="820" />
 </div>
 
 **Features**
